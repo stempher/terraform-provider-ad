@@ -11,7 +11,7 @@ import (
 	"gopkg.in/ldap.v3"
 )
 
-//test function:
+// test function:
 func TestAccAdUser_basic(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck: func() {

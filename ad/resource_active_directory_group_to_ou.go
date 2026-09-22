@@ -67,6 +67,12 @@ func resourceGroupToOU() *schema.Resource {
 				Description: "The resultant gid number that was automatically set.",
 				Computed:    true,
 			},
+			"www_home_page": {
+				Type:        schema.TypeString,
+				Description: "The WWW home page of the group.",
+				Optional:    true,
+				Default:     nil,
+			},
 		},
 	}
 }
@@ -81,6 +87,7 @@ func resourceADGroupToOUCreate(d *schema.ResourceData, meta interface{}) error {
 	auto_gid := d.Get("auto_gid").(bool)
 	auto_gid_min := d.Get("auto_gid_min").(int)
 	auto_gid_max := d.Get("auto_gid_max").(int)
+	www_home_page := d.Get("www_home_page").(string)
 
 	var dnOfGroup string
 	dnOfGroup += "cn=" + groupName + "," + OUDistinguishedName
@@ -88,7 +95,7 @@ func resourceADGroupToOUCreate(d *schema.ResourceData, meta interface{}) error {
 	log.Printf("[DEBUG] Name of the DN is : %s ", dnOfGroup)
 	log.Printf("[DEBUG] Adding the Group to the AD : %s ", groupName)
 
-	err := addGroupToAD(groupName, dnOfGroup, client, description, gidNumber)
+	err := addGroupToAD(groupName, dnOfGroup, client, description, gidNumber, www_home_page)
 	if err != nil {
 		log.Printf("[ERROR] Error while adding a Group to the AD : %s ", err)
 		return fmt.Errorf("Error while adding a Group to the AD %s", err)
@@ -150,7 +157,7 @@ func resourceADGroupToOUCreate(d *schema.ResourceData, meta interface{}) error {
 		}
 	}
 
-	log.Printf("[DEBUG] Group Added to AD successfully: %s", groupName)
+    log.Printf("[DEBUG] Group Added to AD successfully: %s", groupName)
 	d.SetId(OUDistinguishedName + "/" + groupName)
 	return nil
 }
