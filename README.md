@@ -105,7 +105,7 @@ build the provider.
 
 ```sh
 cd $GOPATH/src/github.com/terraform-providers/terraform-provider-ad
-make build
+make build (or GO111MODULE=on go build -a -mod=vendor -o terraform-provider-ad)
 ```
 
 ## Installing the Local Plugin

@@ -5,8 +5,8 @@ import (
 	"log"
 	"strings"
 
+	ldap "github.com/go-ldap/ldap/v3"
 	"github.com/hashicorp/terraform/helper/schema"
-	ldap "gopkg.in/ldap.v3"
 )
 
 func resourceAddToGroup() *schema.Resource {

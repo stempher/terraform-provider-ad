@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	ldap "gopkg.in/ldap.v3"
+	ldap "github.com/go-ldap/ldap/v3"
 
 	"github.com/hashicorp/terraform/helper/schema"
 )
@@ -157,7 +157,7 @@ func resourceADGroupToOUCreate(d *schema.ResourceData, meta interface{}) error {
 		}
 	}
 
-    log.Printf("[DEBUG] Group Added to AD successfully: %s", groupName)
+	log.Printf("[DEBUG] Group Added to AD successfully: %s", groupName)
 	d.SetId(OUDistinguishedName + "/" + groupName)
 	return nil
 }

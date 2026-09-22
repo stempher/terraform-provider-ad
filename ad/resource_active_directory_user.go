@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-ldap/ldap/v3"
 	"github.com/hashicorp/terraform/helper/schema"
-	"gopkg.in/ldap.v3"
 )
 
 func resourceUser() *schema.Resource {

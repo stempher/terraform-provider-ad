@@ -10,7 +10,7 @@ import (
 	ldap "github.com/go-ldap/ldap/v3"
 )
 
-func addGroupToAD(groupName string, dnName string, adConn *ldap.Conn, desc string, gidNumber string) error {
+func addGroupToAD(groupName string, dnName string, adConn *ldap.Conn, desc string, gidNumber string, www string) error {
 	addRequest := ldap.NewAddRequest(dnName, nil)
 	addRequest.Attribute("objectClass", []string{"group"})
 	addRequest.Attribute("sAMAccountName", []string{groupName})
@@ -19,6 +19,9 @@ func addGroupToAD(groupName string, dnName string, adConn *ldap.Conn, desc strin
 	}
 	if gidNumber != "" {
 		addRequest.Attribute("gidNumber", []string{gidNumber})
+	}
+	if www != "" {
+		addRequest.Attribute("wWWHomePage", []string{www})
 	}
 	err := adConn.Add(addRequest)
 	if err != nil {
