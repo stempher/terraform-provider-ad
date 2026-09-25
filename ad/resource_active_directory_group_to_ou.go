@@ -16,6 +16,7 @@ func resourceGroupToOU() *schema.Resource {
 	return &schema.Resource{
 		Create: resourceADGroupToOUCreate,
 		Read:   resourceADGroupToOURead,
+		Update: resourceADGroupToOUUpdate,
 		Delete: resourceADGroupToOUDelete,
 		Schema: map[string]*schema.Schema{
 			"group_name": {
@@ -32,7 +33,6 @@ func resourceGroupToOU() *schema.Resource {
 				Type:     schema.TypeString,
 				Optional: true,
 				Default:  nil,
-				ForceNew: true,
 			},
 			"gid_number": {
 				Type:        schema.TypeString,
@@ -127,14 +127,14 @@ func resourceADGroupToOUCreate(d *schema.ResourceData, meta interface{}) error {
 			// find next available gidNumber
 			err, next_available_gid := find_next_gidNumber(dnOfGroup, client, auto_gid_min, auto_gid_max)
 			if err != nil {
-				log.Fatal(err)
+				fmt.Errorf("%w", err)
 				return fmt.Errorf("[ERROR] Error while searching for next available gidNumber. %s", err)
 			}
 			log.Printf("[DEBUG] Received %d as next available.", next_available_gid)
 			// try updating the group with it
 			err = update_gidNumber(dnOfGroup, client, next_available_gid)
 			if err != nil {
-				log.Fatal(err)
+				fmt.Errorf("%w", err)
 				return fmt.Errorf("[ERROR] Error while updating gidNumber of group. %s", err)
 			}
 			d.Set("auto_gid_number", next_available_gid)
@@ -143,7 +143,7 @@ func resourceADGroupToOUCreate(d *schema.ResourceData, meta interface{}) error {
 			// check for duplicates will return false and break the loop if no dups found
 			err, duplicate_check = find_duplicate_gidNumber(dnOfGroup, client, next_available_gid, auto_gid_min, auto_gid_max)
 			if err != nil {
-				log.Fatal(err)
+				fmt.Errorf("%w", err)
 				return fmt.Errorf("[ERROR] Error while checking for duplicate gidNumbers %s", err)
 			}
 			// if we got a duplicate, wait, and to the top try again
@@ -175,27 +175,100 @@ func resourceADGroupToOURead(d *schema.ResourceData, meta interface{}) error {
 	log.Printf("[DEBUG] Searching the Group from the AD : %s ", groupName)
 
 	searchRequest := ldap.NewSearchRequest(
-		dnOfGroup, // The base dn to search
+		dnOfGroup,                                           // The base dn to search
 		ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
-		"(&(objectClass=Group)(cn="+groupName+"))", // The filter to apply
-		[]string{"dn", "cn"},                       // A list attributes to retrieve
+		"(&(objectClass=Group)(cn="+groupName+"))",          // The filter to apply
+		[]string{"dn", "cn", "description", "wWWHomePage"},  // A list attributes to retrieve
 		nil,
 	)
+
 
 	sr, err := client.Search(searchRequest)
 	if err != nil {
 		log.Printf("[ERROR] Error while searching a Group : %s ", err)
 		return fmt.Errorf("Error while searching a Group : %s", err)
 	}
+	
 	fmt.Println("[ERROR] Found " + strconv.Itoa(len(sr.Entries)) + " Entries")
+
 	for _, entry := range sr.Entries {
+		if err := d.Set("auto_gid", d.Get("auto_gid").(bool)); err != nil {
+			return fmt.Errorf("error setting auto_gid: %s", err)
+		}
+		
 		fmt.Printf("%s: %v\n", entry.DN, entry.GetAttributeValue("cn"))
+
+		description := entry.GetAttributeValue("description")
+		wwwHomePage := entry.GetAttributeValue("wWWHomePage")
+	
+		err = d.Set("description", description)
+		if err != nil {
+		  return fmt.Errorf("error setting description: %s", err)
+        }
+
+		err = d.Set("www_home_page", wwwHomePage)
+		if err != nil {
+		  return fmt.Errorf("error setting www_home_page: %s", err)
+        }
 	}
+
 	if len(sr.Entries) == 0 {
 		log.Println("[ERROR] Group was not found")
 		d.SetId("")
 	}
+
 	return nil
+}
+
+func resourceADGroupToOUUpdate(d *schema.ResourceData, meta interface{}) error {
+	log.Println("[INFO] In Update function")
+	client := meta.(*ldap.Conn)
+
+	groupName := d.Get("group_name").(string)
+	OUDistinguishedName := d.Get("ou_distinguished_name").(string)
+	var dnOfGroup string
+	dnOfGroup += "cn=" + groupName + "," + OUDistinguishedName
+
+	log.Printf("[DEBUG] Updating Group with DN: %s", dnOfGroup)
+
+	modifyRequest := ldap.NewModifyRequest(dnOfGroup, nil)
+
+	hasChanges := false
+
+	if d.HasChange("www_home_page") {
+		_, newVal := d.GetChange("www_home_page")
+		wwwHomePage := newVal.(string)
+
+		if wwwHomePage != "" {
+			modifyRequest.Replace("wWWHomePage", []string{wwwHomePage})
+		} else {
+			modifyRequest.Replace("wWWHomePage", nil)
+		}
+		hasChanges = true
+	}
+
+	if d.HasChange("description") {
+		_, newVal := d.GetChange("description")
+		description := newVal.(string)
+
+		if description != "" {
+			modifyRequest.Replace("description", []string{description})
+		} else {
+			modifyRequest.Replace("description", nil)
+		}
+		hasChanges = true
+	}
+
+	if hasChanges {
+		err := client.Modify(modifyRequest)
+		if err != nil {
+			log.Printf("[ERROR] Error while updating Group: %s", err)
+			return fmt.Errorf("error while updating Group %s: %s", dnOfGroup, err)
+		}
+		log.Println("[INFO] Group successfully updated in Active Directory")
+	}
+
+	return resourceADGroupToOURead(d, meta)
 }
 
 func resourceADGroupToOUDelete(d *schema.ResourceData, meta interface{}) error {
